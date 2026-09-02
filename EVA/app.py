@@ -15,7 +15,9 @@ AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 app = Flask(__name__, template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = 15 * 1024 * 1024
 
-ALLOWED_EXTENSIONS = {"wav", "mp3", "m4a", "ogg", "webm"}
+# Google speech recognition currently works with the WAV AudioFile path used
+# by this deployment, so keep the cloud upload contract intentionally small.
+ALLOWED_EXTENSIONS = {"wav"}
 
 
 def allowed_file(filename):
@@ -39,30 +41,25 @@ def process_audio():
 
     file = request.files["audio"]
     if not file.filename:
-        return jsonify({"error": "Please select an audio file."}), 400
+        return jsonify({"error": "Please select a WAV audio file."}), 400
     if not allowed_file(file.filename):
-        return jsonify({"error": "Unsupported audio format."}), 400
+        return jsonify({"error": "Please upload a WAV audio file."}), 400
 
-    suffix = "." + file.filename.rsplit(".", 1)[1].lower()
     input_path = None
-
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir=AUDIO_DIR) as temp_file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav", dir=AUDIO_DIR) as temp_file:
             input_path = Path(temp_file.name)
             file.save(input_path)
 
-        # Keep emotion detection lightweight and independent of transcription.
         emotion = detect_emotion(str(input_path))
         action = choose_action(emotion)
         text = transcribe(str(input_path)).strip()
 
         if not text:
-            return jsonify({"error": "I couldn't understand the audio. Please try again."}), 422
+            return jsonify({"error": "I couldn't understand the audio. Please try again with a clearer recording."}), 422
 
         response = generate_response(text, emotion, action)
 
-        # Browser SpeechSynthesis handles the voice output, avoiding fragile
-        # server-side TTS dependencies on Linux/cloud runtimes.
         return jsonify({
             "text": text,
             "emotion": emotion,
