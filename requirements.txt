@@ -2,5 +2,5 @@ Flask>=3.0,<4
 gunicorn>=22,<24
 requests>=2.32,<3
 numpy>=1.26,<3
-faster-whisper>=1.0,<2
 soundfile>=0.12,<1
+SpeechRecognition>=3.10,<4
