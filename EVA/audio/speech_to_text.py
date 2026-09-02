@@ -1,19 +1,21 @@
-import os
-
-from faster_whisper import WhisperModel
-
-_model = None
+import speech_recognition as sr
 
 
-def _get_model():
-    global _model
-    if _model is None:
-        model_name = os.getenv("WHISPER_MODEL", "tiny")
-        _model = WhisperModel(model_name, device="cpu", compute_type="int8")
-    return _model
+_recognizer = sr.Recognizer()
 
 
 def transcribe(audio_path):
-    model = _get_model()
-    segments, _ = model.transcribe(audio_path, beam_size=1)
-    return " ".join(segment.text.strip() for segment in segments).strip()
+    """Transcribe a WAV recording using Google's public speech endpoint.
+
+    This keeps the cloud deployment lightweight and avoids downloading a
+    large Whisper model into a memory-constrained Render instance.
+    """
+    with sr.AudioFile(audio_path) as source:
+        audio = _recognizer.record(source)
+
+    try:
+        return _recognizer.recognize_google(audio).strip()
+    except sr.UnknownValueError:
+        return ""
+    except sr.RequestError as exc:
+        raise RuntimeError("Speech recognition service is temporarily unavailable.") from exc
