@@ -1,14 +1,12 @@
 from pathlib import Path
 import tempfile
-import uuid
 
-from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask import Flask, jsonify, render_template, request
 
 from audio.speech_to_text import transcribe
 from models.emotion_model import detect_emotion
 from models.policy_model import choose_action
 from llm.response_generator import generate_response
-from tts.speech import text_to_speech
 
 BASE_DIR = Path(__file__).resolve().parent
 AUDIO_DIR = BASE_DIR / "audio" / "generated"
@@ -34,11 +32,6 @@ def health():
     return jsonify({"status": "ok", "service": "emotion-voice-assistant"})
 
 
-@app.route("/audio/<path:filename>")
-def generated_audio(filename):
-    return send_from_directory(AUDIO_DIR, filename)
-
-
 @app.route("/process", methods=["POST"])
 def process_audio():
     if "audio" not in request.files:
@@ -58,6 +51,7 @@ def process_audio():
             input_path = Path(temp_file.name)
             file.save(input_path)
 
+        # Keep emotion detection lightweight and independent of transcription.
         emotion = detect_emotion(str(input_path))
         action = choose_action(emotion)
         text = transcribe(str(input_path)).strip()
@@ -66,14 +60,15 @@ def process_audio():
             return jsonify({"error": "I couldn't understand the audio. Please try again."}), 422
 
         response = generate_response(text, emotion, action)
-        audio_path = text_to_speech(response, AUDIO_DIR, uuid.uuid4().hex)
 
+        # Browser SpeechSynthesis handles the voice output, avoiding fragile
+        # server-side TTS dependencies on Linux/cloud runtimes.
         return jsonify({
             "text": text,
             "emotion": emotion,
             "action": action,
             "response": response,
-            "audio": f"/audio/{audio_path.name}"
+            "audio": None,
         })
 
     except Exception as exc:
