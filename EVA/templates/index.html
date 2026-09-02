@@ -23,8 +23,52 @@
   </section>
 </main>
 <script>
-const input=document.getElementById('audio'),send=document.getElementById('send'),status=document.getElementById('status'),result=document.getElementById('result');
-send.onclick=async()=>{if(!input.files.length){status.textContent='Please choose an audio file first.';return}send.disabled=true;status.textContent='Processing audio…';result.style.display='none';try{const fd=new FormData();fd.append('audio',input.files[0]);const r=await fetch('/process',{method:'POST',body:fd});const data=await r.json();if(!r.ok)throw new Error(data.error||'Request failed');document.getElementById('text').textContent=data.text;document.getElementById('emotion').textContent=data.emotion;document.getElementById('response').textContent=data.response;document.getElementById('player').src=data.audio;result.style.display='block';status.textContent='Done.'}catch(e){status.textContent=e.message}finally{send.disabled=false}};
+const input=document.getElementById('audio');
+const send=document.getElementById('send');
+const status=document.getElementById('status');
+const result=document.getElementById('result');
+const player=document.getElementById('player');
+
+send.onclick=async()=>{
+  if(!input.files.length){status.textContent='Please choose an audio file first.';return}
+  send.disabled=true;
+  status.textContent='Processing audio… The first request may take a little longer.';
+  result.style.display='none';
+  player.removeAttribute('src');
+  try{
+    const fd=new FormData();
+    fd.append('audio',input.files[0]);
+    const r=await fetch('/process',{method:'POST',body:fd});
+    const raw=await r.text();
+    let data;
+    try{data=raw?JSON.parse(raw):null}catch(_){data=null}
+    if(!r.ok){
+      throw new Error(data?.error||`Server returned HTTP ${r.status}. Check the Render logs.`);
+    }
+    if(!data){
+      throw new Error('The server returned an empty response. Check the Render logs.');
+    }
+    document.getElementById('text').textContent=data.text||'—';
+    document.getElementById('emotion').textContent=data.emotion||'—';
+    document.getElementById('response').textContent=data.response||'—';
+    if(data.audio){
+      player.src=data.audio;
+      player.style.display='block';
+    }else{
+      player.style.display='none';
+      if('speechSynthesis' in window && data.response){
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(data.response));
+      }
+    }
+    result.style.display='block';
+    status.textContent='Done — EVA has responded.';
+  }catch(e){
+    status.textContent=e.message||'Request failed.';
+  }finally{
+    send.disabled=false;
+  }
+};
 </script>
 </body>
 </html>
