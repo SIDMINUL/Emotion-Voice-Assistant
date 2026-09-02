@@ -3,4 +3,8 @@ services:
     name: emotion-voice-assistant
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --chdir EVA app:app --bind 0.0.0.0:$PORT
+    startCommand: gunicorn --chdir EVA app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180
+    healthCheckPath: /health
+    envVars:
+      - key: WHISPER_MODEL
+        value: tiny
