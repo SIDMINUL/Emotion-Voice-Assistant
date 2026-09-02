@@ -4,7 +4,6 @@ import uuid
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
-from audio.features import extract_features
 from audio.speech_to_text import transcribe
 from models.emotion_model import detect_emotion
 from models.policy_model import choose_action
@@ -59,7 +58,6 @@ def process_audio():
             input_path = Path(temp_file.name)
             file.save(input_path)
 
-        features = extract_features(str(input_path))
         emotion = detect_emotion(str(input_path))
         action = choose_action(emotion)
         text = transcribe(str(input_path)).strip()
